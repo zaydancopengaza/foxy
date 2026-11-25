@@ -64,6 +64,31 @@ public class CertAudit {
         AuditTemplates(null, null);
     }
 
+    // RunAll — prints every template including patched/non-vulnerable ones
+    // Use this for PoC evidence when the finding has been remediated
+    public static void RunAll(string dcIP) {
+        Init(dcIP);
+        if (!Bootstrap()) return;
+        EnumCAs();
+        AuditTemplatesAll(null, null);
+    }
+
+    // RunAllTargeted — all fields for one specific CA + template, vuln or not
+    public static void RunAllTargeted(string dcIP, string caName, string templateName) {
+        Init(dcIP);
+        if (!Bootstrap()) return;
+        EnumCAs();
+        Console.WriteLine("");
+        Console.WriteLine("CertAudit - Full Template Dump (PoC Mode)");
+        Console.WriteLine("  CA       : " + caName);
+        Console.WriteLine("  Template : " + templateName);
+        Console.WriteLine("  DC       : " + dcIP);
+        Console.WriteLine("  Time     : " + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
+        Console.WriteLine("");
+        Console.WriteLine(new string('=', 64));
+        AuditTemplatesAll(caName, templateName);
+    }
+
     public static void RunTargeted(string dcIP, string caName, string templateName) {
         Init(dcIP);
         if (!Bootstrap()) return;
@@ -171,7 +196,17 @@ public class CertAudit {
     //  Template Audit
     // =====================================================================
 
+    // Wrapper: vulnerable-only output (original behaviour)
     static void AuditTemplates(string filterCA, string filterTemplate) {
+        AuditTemplatesCore(filterCA, filterTemplate, false);
+    }
+
+    // Wrapper: all templates regardless of vuln state
+    static void AuditTemplatesAll(string filterCA, string filterTemplate) {
+        AuditTemplatesCore(filterCA, filterTemplate, true);
+    }
+
+    static void AuditTemplatesCore(string filterCA, string filterTemplate, bool showAll) {
         string ldapFilter = string.IsNullOrEmpty(filterTemplate)
             ? "(objectClass=pKICertificateTemplate)"
             : "(&(objectClass=pKICertificateTemplate)(cn=" + filterTemplate + "))";
@@ -244,9 +279,8 @@ public class CertAudit {
                                  && acl.LowPrivCanEnroll;
 
                         bool esc4 = isEnabled && acl.WriteFindings.Count > 0;
-                        bool printFull = !string.IsNullOrEmpty(filterTemplate);
 
-                        if (!esc1 && !esc4 && !printFull) continue;
+                        if (!showAll && !esc1 && !esc4) continue;
 
                         found++;
 
